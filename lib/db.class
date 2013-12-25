@@ -1,0 +1,482 @@
+<?php
+class database {
+    public $database;
+    public $table;
+        function __construct($database,$table)
+        {
+                $this->database = FORUM_PREFIX . $database;
+                $this->table = $table;
+                $this->development = "";
+        }
+        
+        public function cleaninput($value) {
+            if ($value === NULL) {
+                return "' + NULL + '";
+            } else {
+                return str_replace("'","''",str_replace("\'", "'", $value));
+            }
+        }
+        
+        public function displayerrors($link) {
+            if (DISPLAY_ERRORS == TRUE) {
+                if (mysql_errno($link) != 0) {
+                    echo mysql_errno($link) . ": " . mysql_error($link) . "<br>\n";
+                    define('MYSQL_ERROR',mysql_errno($link));
+                }
+            } else {
+                define('MYSQL_ERROR',mysql_errno($link));
+            }
+        }
+        public function empty_table($database,$table) {
+                $database = FORUM_PREFIX . $database;
+                $development = "";
+                $Link = mysql_connect('127.0.0.1', user, password);
+                $result = mysql_db_query($database . $development, "SHOW TABLE STATUS LIKE '" . $table . "'",$Link);
+                $row = mysql_fetch_array($result);
+                $nextId = $row['Auto_increment'];
+                mysql_free_result($result);
+                $query = "TRUNCATE `" . $table ."`";
+                mysql_db_query($database . $development, $query, $Link);
+                $query = "ALTER TABLE " . $table . " AUTO_INCREMENT = " . $nextId;
+                mysql_db_query($database . $development, $query, $Link);
+                mysql_close($Link);
+        }
+        
+
+}
+
+class readtable extends database {
+
+		private $Link;
+		private $Result;
+		public $Row;
+		public $holder;
+		public $tempvalues;
+		public $ourvalues;
+		public $query;
+ 
+       function values($index = FALSE, $parameter = FALSE, $order = FALSE, $orderflag = '', $limit = FALSE, $offset = FALSE)
+        {
+        		$this->index = $index;
+        		$this->parameter = $parameter;
+                        $this->Link = mysql_connect('127.0.0.1', user, password);
+                        mysql_set_charset('utf8',$this->Link);
+        		$this->query = "SELECT * from " . $this->table;
+				if ($this->index != FALSE) {
+                                        if (is_array($this->index)) {
+                                            $this->query .= " WHERE";
+                                                    for ($i=0;$i<count($this->index);$i++) {
+                                                        $this->query .= " " . $this->index[$i] . "='" . self::cleaninput($this->parameter[$i]) . "'";
+                                                        if ($i < (count($this->index) - 1)) {
+                                                            $this->query .= " AND";
+                                                        }
+                                                    }
+                                        } else {
+                                            $this->query .= " WHERE " . $this->index . "='" . self::cleaninput($this->parameter) . "'";
+                                        }
+				}
+                                if ($order) {
+                                    $this->query .= " ORDER BY " . $order . " " . $orderflag;
+                                }
+                                if ($limit && $offset) {
+                                    $this->query .= " LIMIT " . $offset . ", " . $limit;
+                                } elseif ($limit) {
+                                    $this->query .= " LIMIT " . $limit;
+                                } elseif ($offset) {
+                                    $this->query .= " LIMIT " . $offset . ", 18446744073709551615";
+                                }
+                                
+
+				$this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+
+				$this->ourvalues = array();
+
+				while ($this->Row = mysql_fetch_array($this->Result)) {
+
+						$this->holder = array_keys($this->Row);
+
+						$this->tempvalues = array();
+
+						for ($i=0;$i<(count($this->Row)/2);$i++) {
+							$this->tempvalues[$this->holder[(2*$i)+1]] = $this->Row[$i];
+						}
+
+						$this->ourvalues[] = $this->tempvalues;
+
+				}
+                                self::displayerrors($this->Link);
+				mysql_close($this->Link);
+                                if (count($this->ourvalues) > 0){
+                                    return $this->ourvalues;
+                                } else {
+                                    $this->ourvalues = FALSE;
+                                    return FALSE;
+                                }
+
+
+
+
+        }
+        function customqueryvalues($query, $select = '*',$set = FALSE)
+        {
+                        $this->Link = mysql_connect('127.0.0.1', user, password);
+                        mysql_set_charset('utf8',$this->Link);
+                        if ($set !== FALSE) {
+                            if (is_array($set)) {
+                                foreach($set as $value) {
+                                    mysql_db_query($this->database . $this->development, 'SET ' . $value . '; ', $this->Link);
+                                }
+                            } else {
+                                mysql_db_query($this->database . $this->development, 'SET ' . $set . '; ', $this->Link);
+                            }
+                        }
+        		$this->query = "SELECT " . $select . " from " . $this->table . " WHERE " . $query;
+                                
+
+                
+				$this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+
+				$this->ourvalues = array();
+
+				while ($this->Row = mysql_fetch_array($this->Result)) {
+
+						$this->holder = array_keys($this->Row);
+
+						$this->tempvalues = array();
+
+						for ($i=0;$i<(count($this->Row)/2);$i++) {
+							$this->tempvalues[$this->holder[(2*$i)+1]] = $this->Row[$i];
+						}
+
+						$this->ourvalues[] = $this->tempvalues;
+
+				}
+                                self::displayerrors($this->Link);
+				mysql_close($this->Link);
+                                
+                                if (count($this->ourvalues) > 0){
+                                    return $this->ourvalues;
+                                } else {
+                                    $this->ourvalues = FALSE;
+                                    return FALSE;
+                                }
+
+
+
+
+        }
+
+
+}
+
+class writetotable extends database {
+
+		private $Link;
+		public $Result;
+		public $query;
+		public $multiinputkeys;
+
+        function values($input, $returnkey = FALSE)
+        {
+        	$this->input = $input;
+        	$this->multiinputkeys = array_keys($this->input);
+        	if (is_array($this->input[$this->multiinputkeys[0]]) == FALSE) {
+
+                        $this->Link = mysql_connect('127.0.0.1', user, password);
+                        mysql_set_charset('utf8',$this->Link);
+        		$this->query = "INSERT INTO " . $this->table. " VALUES (";
+        		$this->inputkeys = array_keys($this->input);
+        		for ($i=0;$i<count($this->input);$i++) {
+        			if ($i < (count($this->input) - 1)) {
+        				$this->query .= "'" . self::cleaninput($this->input[$this->inputkeys[$i]]) . "',";
+        			} else {
+        				$this->query .= "'" . self::cleaninput($this->input[$this->inputkeys[$i]]) . "')";
+        			}
+        		}
+
+
+
+				
+				$this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+                                if ($returnkey == TRUE) {
+                                    $addedindex = mysql_insert_id();
+                                }
+                                self::displayerrors($this->Link);
+				mysql_close($this->Link);
+
+
+			} else {
+				$this->Link = mysql_connect('127.0.0.1', user, password);
+                                mysql_set_charset('utf8',$this->Link);
+				for ($j=0;$j<count($this->input);$j++) {
+
+					$this->query = "INSERT INTO " . $this->table. " VALUES (";
+					$this->inputkeys = array_keys($this->input[$this->multiinputkeys[$j]]);
+					for ($i=0;$i<count($this->input[$this->multiinputkeys[$j]]);$i++) {
+						if ($i < (count($this->input[$this->multiinputkeys[$j]]) - 1)) {
+							$this->query .= "'" . self::cleaninput($this->input[$this->multiinputkeys[$j]][$this->inputkeys[$i]]) . "',";
+						} else {
+							$this->query .= "'" . self::cleaninput($this->input[$this->multiinputkeys[$j]][$this->inputkeys[$i]]) . "')";
+						}
+					}
+
+					
+                                        $this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+                                        if ($returnkey == TRUE) {
+                                            $addedindex[] = mysql_insert_id();
+                                        }
+				}
+                                self::displayerrors($this->Link);
+				mysql_close($this->Link);
+
+
+
+			}
+                        
+                        
+                        if ($returnkey == TRUE) {
+                            return $addedindex;
+                        }
+
+
+        }
+
+
+}
+
+class updatetable extends database {
+
+		private $Link;
+		private $Result;
+		public $query;
+
+        function values($key, $input)
+        {
+        		$this->key = $key;
+        		$this->input = $input;
+        		$this->multiinputkeys = array_keys($this->input);
+
+        		if (is_array($this->input[$this->multiinputkeys[0]]) == FALSE) {
+
+        			$this->inputkeys = array_keys($this->input);
+                                $this->Link = mysql_connect('127.0.0.1', user, password);
+                                        mysql_set_charset('utf8',$this->Link);
+					$this->query = "UPDATE `" . $this->database . $this->development . "`.`" . $this->table . "` SET ";
+
+					for ($i=0;$i<count($this->input);$i++) {
+						if ($i < (count($this->input) - 1)) {
+							$this->query .= "`" . $this->inputkeys[$i]. "` = '" . self::cleaninput($this->input[$this->inputkeys[$i]]). "', ";
+						} else {
+							$this->query .= "`" . $this->inputkeys[$i]. "` = '" . self::cleaninput($this->input[$this->inputkeys[$i]]). "'";
+						}
+					}
+
+					$this->query .= " WHERE `" . $this->table . "`.`id` =" . $this->key . "";
+
+					$this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+                                        self::displayerrors($this->Link);
+					mysql_close($this->Link);
+
+				} else {
+
+					$this->Link = mysql_connect('127.0.0.1', user, password);
+                                        mysql_set_charset('utf8',$this->Link);
+
+					for ($j=0;$j<count($this->input[$this->multiinputkeys[$j]]);$j++) {
+
+					$this->inputkeys = array_keys($this->input[$this->multiinputkeys[$j]]);
+
+						$this->query = "UPDATE `" . $this->database . $this->development . "`.`" . $this->table . "` SET ";
+
+						for ($i=0;$i<count($this->input[$this->multiinputkeys[$j]]);$i++) {
+							if ($i < (count($this->input[$this->multiinputkeys[$j]]) - 1)) {
+								$this->query .= "`" . $this->inputkeys[$i]. "` = '" . self::cleaninput($this->input[$this->multiinputkeys[$j]][$this->inputkeys[$i]]). "', ";
+							} else {
+								$this->query .= "`" . $this->inputkeys[$i]. "` = '" . self::cleaninput($this->input[$this->multiinputkeys[$j]][$this->inputkeys[$i]]). "'";
+							}
+						}
+
+						$this->query .= " WHERE `" . $this->table . "`.`id` =" . $this->key[$j] . "";
+
+						$this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+
+					}
+                                        self::displayerrors($this->Link);
+					mysql_close($this->Link);
+
+                                        
+
+				}
+                                
+
+        }
+
+        function nonuserinputvalues($key, $input)
+        {
+                $this->key = $key;
+                $this->input = $input;
+                $this->multiinputkeys = array_keys($this->input);
+
+                if (is_array($this->input[$this->multiinputkeys[0]]) == FALSE) {
+
+                    $this->inputkeys = array_keys($this->input);
+                                $this->Link = mysql_connect('127.0.0.1', user, password);
+                                        mysql_set_charset('utf8',$this->Link);
+                    $this->query = "UPDATE `" . $this->database . $this->development . "`.`" . $this->table . "` SET ";
+
+                    for ($i=0;$i<count($this->input);$i++) {
+                        if ($i < (count($this->input) - 1)) {
+                            $this->query .= "`" . $this->inputkeys[$i]. "` = '" . $this->input[$this->inputkeys[$i]]. "', ";
+                        } else {
+                            $this->query .= "`" . $this->inputkeys[$i]. "` = '" . $this->input[$this->inputkeys[$i]]. "'";
+                        }
+                    }
+
+                    $this->query .= " WHERE `" . $this->table . "`.`id` =" . $this->key . "";
+
+                    $this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+                                        self::displayerrors($this->Link);
+                    mysql_close($this->Link);
+
+                } else {
+
+                    $this->Link = mysql_connect('127.0.0.1', user, password);
+                                        mysql_set_charset('utf8',$this->Link);
+
+                    for ($j=0;$j<count($this->input[$this->multiinputkeys[$j]]);$j++) {
+
+                    $this->inputkeys = array_keys($this->input[$this->multiinputkeys[$j]]);
+
+                        $this->query = "UPDATE `" . $this->database . $this->development . "`.`" . $this->table . "` SET ";
+
+                        for ($i=0;$i<count($this->input[$this->multiinputkeys[$j]]);$i++) {
+                            if ($i < (count($this->input[$this->multiinputkeys[$j]]) - 1)) {
+                                $this->query .= "`" . $this->inputkeys[$i]. "` = '" . $this->input[$this->multiinputkeys[$j]][$this->inputkeys[$i]]. "', ";
+                            } else {
+                                $this->query .= "`" . $this->inputkeys[$i]. "` = '" . $this->input[$this->multiinputkeys[$j]][$this->inputkeys[$i]]. "'";
+                            }
+                        }
+
+                        $this->query .= " WHERE `" . $this->table . "`.`id` =" . $this->key[$j] . "";
+
+                        $this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+
+                    }
+                                        self::displayerrors($this->Link);
+                    mysql_close($this->Link);
+
+                                        
+
+                }
+                                
+
+        }
+        function add_one($key,$column,$id = "id") {
+            $this->key = $key;
+            $this->column = $column;
+            $this->query = "UPDATE `" . $this->database . $this->development . "`.`" . $this->table . "` SET `" . $this->column ."`=`" . $this->column ."` + 1  WHERE `" . $this->table . "`.`" . $id . "` =" . $this->key . "";
+            $this->Link = mysql_connect('127.0.0.1', user, password);
+            $this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+            self::displayerrors($this->Link);
+            mysql_close($this->Link);
+        }
+
+}
+
+class deletefromtable extends database {
+
+		private $Link;
+		private $Result;
+		public $query;
+
+        function values($key, $id = "id")
+        {
+        		$this->key = $key;
+
+        		if (is_array($this->key) == FALSE) {
+
+					$this->query = "DELETE FROM `" . $this->database . $this->development . "`.`" . $this->table . "` WHERE `" . $this->table . "`.`" . $id . "` =" . $this->key . "";
+					$this->Link = mysql_connect('127.0.0.1', user, password);
+					$this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+					self::displayerrors($this->Link);
+                                        mysql_close($this->Link);
+
+				} else {
+
+					$this->Link = mysql_connect('127.0.0.1', user, password);
+
+
+					for ($j=0;$j<count($this->key);$j++) {
+
+						$this->query = "DELETE FROM `" . $this->database . $this->development . "`.`" . $this->table . "` WHERE `" . $this->table . "`.`" . $id . "` =" . $this->key[$j] . "";
+
+						$this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+
+					}
+                                        self::displayerrors($this->Link);
+					mysql_close($this->Link);
+
+
+
+				}
+
+        }
+
+}
+
+class auto_increment extends database {
+    private $Link;
+    private $Result;
+    public $query;
+    function increment($value) {
+        if (is_numeric($value) && $value > 1) {
+            $value++;
+            $this->query = "ALTER TABLE " . $this->table . " AUTO_INCREMENT = " . parent::cleaninput($value);
+            $this->Link = mysql_connect('127.0.0.1', user, password);
+            $this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+            mysql_close($this->Link);
+        }
+    }
+}
+
+
+class emptytable extends database {
+    private $Link;
+    private $Result;
+    public $query;
+            function execute() {
+                $this->Link = mysql_connect('127.0.0.1', user, password);
+                $this->query = "TRUNCATE `" . $this->table ."`";
+                $this->Result = mysql_db_query($this->database . $this->development, $this->query, $this->Link);
+                mysql_close($this->Link);
+        }
+}
+class customquery extends database {
+
+		private $Link;
+		private $query;
+		private $Result;
+
+        function values($query)
+        {
+        		$this->query = $query;
+
+				$this->Link = mysql_connect('127.0.0.1', user, password);
+                                mysql_set_charset('utf-8');
+				$selected = mysql_select_db($this->database . $this->development,$this->Link)
+  				or die("Could not select database");
+
+				$result = mysql_query($this->query);
+
+				return $result;
+
+        }
+
+		function collect_row($result)
+        {
+				return mysql_fetch_array($result);
+        }
+
+}
+
+?>

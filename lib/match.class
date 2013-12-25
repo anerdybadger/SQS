@@ -1,0 +1,104 @@
+<?php
+
+/**
+ * Description of match
+ *
+ * @author Peter Stone
+ */
+class match {
+    function __construct() {
+        $this->set_variables(func_get_args());
+        $this->winner = 6;
+    }
+    /*
+     *   Variable Setting Functions
+     */
+    public function set_variables($variables) {
+        if (count($variables) == 8) {
+            $this->rkp_1 = $variables[0];
+            $this->rkp_2 = $variables[1];
+            $this->style_1 = $variables[2];
+            $this->style_2 = $variables[3];
+            $this->team_1 = $variables[4];
+            $this->team_2 = $variables[5];
+            $this->nodraws = $variables[6];
+            $this->neutral = $variables[7];
+            $this->score_1 = array('normal_time' => 0,'extra_time' => 0,'penalties' => array());
+            $this->score_2 = array('normal_time' => 0,'extra_time' => 0,'penalties' => array());
+            $this->scorers_1 = array();
+            $this->scorers_2 = array();
+            $this->get_match_id();
+            $this->get_ratios();
+        } else {
+            throw new Exception('Variables missing for match() function');
+        }
+    }
+    public function get_ratios() {
+        $this->R_1 = $this->rkp_1 / 2;
+        $this->R_2 = $this->rkp_2 / 2;
+    }
+    public function coin_toss() {
+        if ((rand(0,1000)/1000) > 0.5) {
+            $this->coin_result = array(1,2);
+        } else {
+           $this->coin_result = array(2,1);
+        }
+    }
+    /*
+     *   Scoring Functions
+     */
+    public function normal_time() {
+        
+    }
+    public function extra_time() {
+        
+    }
+    public function penalties() {
+        $this->coin_toss();
+        var_dump($this->coin_result);
+        var_dump($this->{"R_" . $this->coin_result[0]});
+        // Reduce the ranking point values and it is far easier to score a penalty
+        $this->rkp_1 /= 4;
+        $this->rkp_2 /= 4;
+        // There will be a miniumum of three penalty rounds
+        for ($i=0;$i<3;$i++) {
+            
+        }
+        if (abs(array_sum($this->score_1['penalties']) - array_sum($this->score_2['penalties'])) != 3) {
+            while (!$winner) {
+                // Roll dice for team who won coin toss
+                
+                // Check to see if pens over
+                if (!$this->check_for_penalty_winners()) {
+                    // Roll Dice for team who lost coin toss
+                    
+                    if ($this->check_for_penalty_winners()) {
+                        $winner = TRUE;
+                    }
+                } else {
+                    $winner = TRUE;
+                }
+            }
+        }
+    }
+    public function check_for_penalty_winners() {
+        return TRUE;
+    }
+    /*
+     *  Database Functions
+     */
+    public function send_scorer_to_database($team_id,$scorer_id,$time,$type) {
+        $scorer = new writetotable('main','goals');
+        $scorer->values(array(0,$team_id,$scorer_id,$time,$type,$this->match_id));
+        unset($scorer);
+        gc_collect_cycles();
+    }
+    public function get_match_id() {
+        $match = new writetotable('main','matches');
+        $this->match_id = $match->values(array(0,$this->team_1,$this->team_2,$this->neutral),TRUE);
+        unset($match);
+        gc_collect_cycles();
+    }
+}
+
+?>

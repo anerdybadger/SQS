@@ -1,0 +1,16 @@
+Options +FollowSymLinks
+IndexIgnore */*
+    
+# Turn on the RewriteEngine
+RewriteEngine On
+
+# Add .class file extension
+AddType application/x-httpd-php .class
+
+#  Rules
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . index.php
+
+Options -Indexes 
+ErrorDocument 403 /404/index.php
